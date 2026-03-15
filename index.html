@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Golf Wx">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<title>Golf Wx</title>
+<style>
+  :root {
+    --green: #1a5e1f;
+    --green-light: #2d8a33;
+    --green-dark: #0d3311;
+    --fairway: #e8f5e9;
+    --sand: #f5f0e1;
+    --white: #ffffff;
+    --gray: #6b7280;
+    --red: #dc2626;
+    --amber: #d97706;
+    --blue: #2563eb;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    background: var(--green-dark);
+    color: #1a1a1a;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .header {
+    background: linear-gradient(135deg, var(--green-dark), var(--green));
+    color: white;
+    padding: env(safe-area-inset-top, 20px) 16px 16px;
+    text-align: center;
+  }
+  .header h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+  .header .subtitle { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+
+  .zip-bar {
+    display: flex; gap: 8px; padding: 12px 16px;
+    background: var(--green);
+  }
+  .zip-bar input {
+    flex: 1; padding: 10px 14px; border-radius: 10px; border: none;
+    font-size: 16px; background: rgba(255,255,255,0.95); color: #1a1a1a;
+  }
+  .zip-bar button {
+    padding: 10px 20px; border-radius: 10px; border: none;
+    background: var(--sand); color: var(--green-dark);
+    font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+
+  .content { padding: 0 12px 100px; }
+
+  .loading {
+    text-align: center; padding: 60px 20px; color: white;
+    font-size: 16px;
+  }
+  .loading .spinner {
+    width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.2);
+    border-top-color: white; border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .card {
+    background: var(--white); border-radius: 16px;
+    margin-top: 12px; overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  }
+  .card-header {
+    padding: 14px 16px; font-weight: 700; font-size: 14px;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    background: var(--green); color: white;
+  }
+  .card-body { padding: 16px; }
+
+  /* Playability Index */
+  .playability {
+    text-align: center; padding: 24px 16px;
+  }
+  .play-score {
+    font-size: 72px; font-weight: 800; line-height: 1;
+    background: linear-gradient(135deg, var(--green), var(--green-light));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .play-score.score-caution {
+    background: linear-gradient(135deg, var(--amber), #b45309);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .play-score.score-poor {
+    background: linear-gradient(135deg, var(--red), #991b1b);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .play-label { font-size: 13px; color: var(--gray); margin-top: 4px; font-weight: 600; }
+  .play-verdict {
+    font-size: 18px; font-weight: 700; margin-top: 8px;
+  }
+
+  /* Metric rows */
+  .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #e5e7eb; }
+  .metric-grid.three-col { grid-template-columns: 1fr 1fr 1fr; }
+  .metric {
+    background: white; padding: 14px 12px; text-align: center;
+  }
+  .metric-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--gray); font-weight: 600; }
+  .metric-value { font-size: 22px; font-weight: 700; margin-top: 4px; color: #1a1a1a; }
+  .metric-unit { font-size: 11px; color: var(--gray); }
+  .metric-note { font-size: 10px; color: var(--gray); margin-top: 2px; }
+
+  /* Wind rose */
+  .wind-detail { padding: 16px; }
+  .wind-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+  .wind-row:last-child { border: none; }
+  .wind-row .label { font-size: 13px; color: var(--gray); }
+  .wind-row .value { font-size: 15px; font-weight: 600; }
+
+  /* Hourly forecast */
+  .hourly-scroll {
+    display: flex; overflow-x: auto; gap: 2px; padding: 12px;
+    -webkit-overflow-scrolling: touch; scroll-snap-type: x mandatory;
+  }
+  .hourly-scroll::-webkit-scrollbar { display: none; }
+  .hour-cell {
+    min-width: 70px; text-align: center; padding: 10px 6px;
+    border-radius: 12px; scroll-snap-align: start;
+    background: var(--fairway);
+  }
+  .hour-cell.peak { background: #fef3c7; }
+  .hour-cell .time { font-size: 11px; font-weight: 700; color: var(--gray); }
+  .hour-cell .temp { font-size: 18px; font-weight: 700; margin: 6px 0 2px; }
+  .hour-cell .wx-icon { font-size: 20px; }
+  .hour-cell .wind { font-size: 10px; color: var(--gray); margin-top: 4px; }
+  .hour-cell .precip { font-size: 10px; color: var(--blue); font-weight: 600; }
+
+  /* Narrative */
+  .narrative {
+    font-size: 14px; line-height: 1.65; color: #374151;
+    padding: 16px;
+  }
+  .narrative strong { color: #1a1a1a; }
+
+  /* Alerts */
+  .alert-banner {
+    background: #fef2f2; border-left: 4px solid var(--red);
+    padding: 12px 16px; margin-top: 12px; border-radius: 0 12px 12px 0;
+  }
+  .alert-banner .alert-title { font-weight: 700; color: var(--red); font-size: 13px; }
+  .alert-banner .alert-text { font-size: 12px; color: #7f1d1d; margin-top: 4px; }
+
+  /* Course conditions */
+  .conditions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; }
+  .cond-item { }
+  .cond-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--gray); font-weight: 600; }
+  .cond-value { font-size: 14px; font-weight: 600; margin-top: 2px; }
+  .cond-value.good { color: var(--green); }
+  .cond-value.caution { color: var(--amber); }
+  .cond-value.poor { color: var(--red); }
+
+  .footer-note {
+    text-align: center; padding: 16px; font-size: 11px; color: rgba(255,255,255,0.5);
+  }
+
+  /* 7-day */
+  .daily-row {
+    display: flex; align-items: center; padding: 10px 16px;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  .daily-row:last-child { border: none; }
+  .daily-day { width: 44px; font-size: 13px; font-weight: 700; color: var(--gray); }
+  .daily-icon { width: 28px; font-size: 20px; text-align: center; }
+  .daily-temps { flex: 1; display: flex; align-items: center; gap: 8px; margin-left: 12px; }
+  .daily-lo { font-size: 13px; color: var(--gray); width: 32px; text-align: right; }
+  .daily-bar { flex: 1; height: 6px; border-radius: 3px; background: #e5e7eb; position: relative; overflow: hidden; }
+  .daily-bar-fill { position: absolute; top: 0; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--blue), var(--amber)); }
+  .daily-hi { font-size: 13px; font-weight: 700; width: 32px; }
+  .daily-play { width: 36px; text-align: right; font-size: 12px; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>GOLF WX</h1>
+  <div class="subtitle">Professional Course Meteorology</div>
+</div>
+
+<div class="zip-bar">
+  <input type="text" id="zipInput" placeholder="ZIP Code" value="93105" inputmode="numeric" maxlength="5">
+  <button onclick="loadForecast()">FETCH</button>
+</div>
+
+<div class="content" id="app">
+  <div class="loading">
+    <div class="spinner"></div>
+    Loading meteorological data...
+  </div>
+</div>
+
+<script>
+const WMO_CODES = {
+  0: ['Clear', '☀️'], 1: ['Mostly Clear', '🌤'], 2: ['Partly Cloudy', '⛅'],
+  3: ['Overcast', '☁️'], 45: ['Fog', '🌫'], 48: ['Rime Fog', '🌫'],
+  51: ['Lt Drizzle', '🌦'], 53: ['Drizzle', '🌦'], 55: ['Hvy Drizzle', '🌧'],
+  56: ['Fzg Drizzle', '🌧'], 57: ['Hvy Fzg Dzl', '🌧'],
+  61: ['Lt Rain', '🌦'], 63: ['Rain', '🌧'], 65: ['Hvy Rain', '🌧'],
+  66: ['Fzg Rain', '🧊'], 67: ['Hvy Fzg Rain', '🧊'],
+  71: ['Lt Snow', '🌨'], 73: ['Snow', '🌨'], 75: ['Hvy Snow', '❄️'],
+  77: ['Grains', '❄️'], 80: ['Lt Showers', '🌦'], 81: ['Showers', '🌧'],
+  82: ['Hvy Showers', '🌧'], 85: ['Lt Snow Shr', '🌨'], 86: ['Hvy Snow Shr', '❄️'],
+  95: ['T-Storm', '⛈'], 96: ['T-Storm+Hail', '⛈'], 99: ['Severe T-Storm', '⛈']
+};
+
+function wmoLookup(code) {
+  return WMO_CODES[code] || ['Unknown', '❓'];
+}
+
+function degToCompass(deg) {
+  const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  return dirs[Math.round(deg / 22.5) % 16];
+}
+
+function cToF(c) { return Math.round(c * 9/5 + 32); }
+function kmhToMph(k) { return Math.round(k * 0.621371); }
+function mmToIn(mm) { return (mm * 0.0393701).toFixed(2); }
+
+function calcDewpoint(tempC, rh) {
+  const a = 17.27, b = 237.7;
+  const alpha = (a * tempC) / (b + tempC) + Math.log(rh / 100);
+  return (b * alpha) / (a - alpha);
+}
+
+function calcHeatIndex(tempF, rh) {
+  if (tempF < 80) return tempF;
+  let hi = -42.379 + 2.04901523*tempF + 10.14333127*rh
+    - 0.22475541*tempF*rh - 0.00683783*tempF*tempF
+    - 0.05481717*rh*rh + 0.00122874*tempF*tempF*rh
+    + 0.00085282*tempF*rh*rh - 0.00000199*tempF*tempF*rh*rh;
+  return Math.round(hi);
+}
+
+function calcWindChill(tempF, windMph) {
+  if (tempF > 50 || windMph < 3) return tempF;
+  return Math.round(35.74 + 0.6215*tempF - 35.75*Math.pow(windMph,0.16) + 0.4275*tempF*Math.pow(windMph,0.16));
+}
+
+function calcPlayability(tempF, windMph, gustMph, precipProb, rh, uvIndex, weatherCode) {
+  let score = 100;
+
+  // Temperature: ideal 65-82F
+  if (tempF < 45) score -= 30;
+  else if (tempF < 55) score -= 15;
+  else if (tempF < 65) score -= 5;
+  else if (tempF > 95) score -= 30;
+  else if (tempF > 88) score -= 15;
+  else if (tempF > 82) score -= 5;
+
+  // Wind: sustained
+  if (windMph > 25) score -= 30;
+  else if (windMph > 18) score -= 20;
+  else if (windMph > 12) score -= 10;
+  else if (windMph > 8) score -= 3;
+
+  // Gusts
+  if (gustMph > 35) score -= 15;
+  else if (gustMph > 25) score -= 10;
+  else if (gustMph > 18) score -= 5;
+
+  // Precip probability
+  if (precipProb > 70) score -= 25;
+  else if (precipProb > 50) score -= 15;
+  else if (precipProb > 30) score -= 8;
+  else if (precipProb > 15) score -= 3;
+
+  // Active precip weather codes
+  if (weatherCode >= 95) score -= 30; // thunderstorms
+  else if (weatherCode >= 61) score -= 15; // rain
+  else if (weatherCode >= 51) score -= 8; // drizzle
+
+  // Humidity discomfort
+  if (rh > 90) score -= 10;
+  else if (rh > 80) score -= 5;
+
+  // UV penalty for extreme
+  if (uvIndex > 10) score -= 8;
+  else if (uvIndex > 8) score -= 3;
+
+  return Math.max(0, Math.min(100, score));
+}
+
+function getVerdict(score) {
+  if (score >= 85) return ['Excellent — Prime Conditions', 'good'];
+  if (score >= 70) return ['Good — Favorable for Play', 'good'];
+  if (score >= 55) return ['Fair — Playable with Caveats', 'caution'];
+  if (score >= 35) return ['Marginal — Challenging Conditions', 'caution'];
+  return ['Poor — Postpone Recommended', 'poor'];
+}
+
+function getScoreClass(score) {
+  if (score >= 55) return '';
+  if (score >= 35) return 'score-caution';
+  return 'score-poor';
+}
+
+function courseCondition(tempF, rh, precipMm24h, windMph) {
+  const results = {};
+
+  // Green speed estimate
+  if (precipMm24h > 10) results.greens = ['Slow — Saturated', 'poor'];
+  else if (precipMm24h > 3) results.greens = ['Moderate — Damp', 'caution'];
+  else if (rh > 90) results.greens = ['Moderate — Dewy', 'caution'];
+  else results.greens = ['Fast — Firm', 'good'];
+
+  // Fairway
+  if (precipMm24h > 15) results.fairways = ['Soft — Standing Water', 'poor'];
+  else if (precipMm24h > 5) results.fairways = ['Yielding — Wet', 'caution'];
+  else results.fairways = ['Firm — Good Lies', 'good'];
+
+  // Bunkers
+  if (precipMm24h > 8) results.bunkers = ['Packed/Wet Sand', 'poor'];
+  else if (precipMm24h > 2) results.bunkers = ['Slightly Damp', 'caution'];
+  else results.bunkers = ['Dry — Normal Splash', 'good'];
+
+  // Ball flight
+  if (windMph > 20) results.ballFlight = ['Severely Affected', 'poor'];
+  else if (windMph > 12) results.ballFlight = ['Club Up 1-2', 'caution'];
+  else results.ballFlight = ['True Flight', 'good'];
+
+  return results;
+}
+
+function windNarrative(windMph, gustMph, windDir) {
+  let s = '';
+  const dir = degToCompass(windDir);
+  if (windMph <= 5) {
+    s = `Light and variable winds from the ${dir} at ${windMph} mph. Negligible impact on ball flight; club selection unaffected.`;
+  } else if (windMph <= 12) {
+    s = `Moderate ${dir} flow sustained at ${windMph} mph (gusts to ${gustMph} mph). Factor 1/2 to 1 club adjustment on exposed holes aligned with wind vector. Tee shots will see minor lateral drift; approach shots should hold greens.`;
+  } else if (windMph <= 20) {
+    s = `Brisk ${dir} wind sustained ${windMph} mph with gusts reaching ${gustMph} mph. Expect 1-2 club wind adjustment. Ball flight will be significantly affected — consider knockdown shots and low trajectories. Putting impacted on exposed greens.`;
+  } else {
+    s = `Strong ${dir} flow at ${windMph} mph gusting to ${gustMph} mph. Tournament-level wind conditions. Expect 2-3 club adjustments, significant ball displacement, and challenging putting surfaces. Recommend conservative course management.`;
+  }
+  return s;
+}
+
+async function geocodeZip(zip) {
+  const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${zip}&count=1&language=en&format=json&country=US`);
+  const data = await res.json();
+  if (!data.results || data.results.length === 0) {
+    // Fallback: try as a numeric search via zip code API
+    const res2 = await fetch(`https://api.zippopotam.us/us/${zip}`);
+    if (!res2.ok) throw new Error('ZIP not found');
+    const d2 = await res2.json();
+    return { lat: parseFloat(d2.places[0].latitude), lon: parseFloat(d2.places[0].longitude), name: `${d2.places[0]['place name']}, ${d2.places[0]['state abbreviation']}` };
+  }
+  return { lat: data.results[0].latitude, lon: data.results[0].longitude, name: `${data.results[0].name}, ${data.results[0].admin1 || ''}` };
+}
+
+async function fetchWeather(lat, lon) {
+  const params = [
+    'latitude=' + lat, 'longitude=' + lon,
+    'hourly=temperature_2m,relative_humidity_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,cloud_cover,visibility,surface_pressure',
+    'daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weather_code,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max,sunrise,sunset',
+    'temperature_unit=celsius',
+    'wind_speed_unit=kmh',
+    'precipitation_unit=mm',
+    'timezone=auto',
+    'forecast_days=7'
+  ].join('&');
+  const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+  return res.json();
+}
+
+function render(data, locationName) {
+  const h = data.hourly;
+  const d = data.daily;
+  const now = new Date();
+  const currentHourIdx = h.time.findIndex(t => new Date(t) >= now) || 0;
+
+  // Current conditions
+  const tempC = h.temperature_2m[currentHourIdx];
+  const tempF = cToF(tempC);
+  const rh = h.relative_humidity_2m[currentHourIdx];
+  const windKmh = h.wind_speed_10m[currentHourIdx];
+  const windMph = kmhToMph(windKmh);
+  const gustKmh = h.wind_gusts_10m[currentHourIdx];
+  const gustMph = kmhToMph(gustKmh);
+  const windDir = h.wind_direction_10m[currentHourIdx];
+  const precipProb = h.precipitation_probability[currentHourIdx];
+  const precipMm = h.precipitation[currentHourIdx];
+  const weatherCode = h.weather_code[currentHourIdx];
+  const uvIndex = h.uv_index[currentHourIdx];
+  const cloudCover = h.cloud_cover[currentHourIdx];
+  const visibility = h.visibility[currentHourIdx];
+  const pressure = h.surface_pressure[currentHourIdx];
+  const dewpointC = calcDewpoint(tempC, rh);
+  const dewpointF = cToF(dewpointC);
+  const heatIndex = calcHeatIndex(tempF, rh);
+  const windChill = calcWindChill(tempF, windMph);
+  const apparentTemp = tempF >= 80 ? heatIndex : windChill;
+  const [wxLabel, wxIcon] = wmoLookup(weatherCode);
+
+  // Playability
+  const playScore = calcPlayability(tempF, windMph, gustMph, precipProb, rh, uvIndex, weatherCode);
+  const [verdict, verdictClass] = getVerdict(playScore);
+
+  // 24h precip sum for course conditions
+  let precip24h = 0;
+  for (let i = Math.max(0, currentHourIdx - 24); i <= currentHourIdx; i++) {
+    precip24h += h.precipitation[i] || 0;
+  }
+  const conds = courseCondition(tempF, rh, precip24h, windMph);
+
+  // Sunrise/sunset
+  const sunrise = new Date(d.sunrise[0]);
+  const sunset = new Date(d.sunset[0]);
+  const sunriseStr = sunrise.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const sunsetStr = sunset.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+  // Hourly window (next 14 hours)
+  let hourlyHTML = '';
+  for (let i = currentHourIdx; i < Math.min(currentHourIdx + 14, h.time.length); i++) {
+    const dt = new Date(h.time[i]);
+    const hr = dt.getHours();
+    const timeStr = hr === 0 ? '12a' : hr < 12 ? `${hr}a` : hr === 12 ? '12p' : `${hr-12}p`;
+    const [, icon] = wmoLookup(h.weather_code[i]);
+    const isPeak = hr >= 7 && hr <= 10; // prime tee time window
+    hourlyHTML += `
+      <div class="hour-cell ${isPeak ? 'peak' : ''}">
+        <div class="time">${i === currentHourIdx ? 'Now' : timeStr}</div>
+        <div class="wx-icon">${icon}</div>
+        <div class="temp">${cToF(h.temperature_2m[i])}°</div>
+        <div class="wind">${kmhToMph(h.wind_speed_10m[i])}mph ${degToCompass(h.wind_direction_10m[i])}</div>
+        ${h.precipitation_probability[i] > 10 ? `<div class="precip">${h.precipitation_probability[i]}%</div>` : ''}
+      </div>`;
+  }
+
+  // 7-day
+  const allHighs = d.temperature_2m_max.map(c => cToF(c));
+  const allLows = d.temperature_2m_min.map(c => cToF(c));
+  const tempRange = [Math.min(...allLows), Math.max(...allHighs)];
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let dailyHTML = '';
+  for (let i = 0; i < d.time.length; i++) {
+    const dt = new Date(d.time[i] + 'T12:00:00');
+    const dayName = i === 0 ? 'Today' : days[dt.getDay()];
+    const [, icon] = wmoLookup(d.weather_code[i]);
+    const hi = allHighs[i], lo = allLows[i];
+    const range = tempRange[1] - tempRange[0] || 1;
+    const leftPct = ((lo - tempRange[0]) / range * 100).toFixed(0);
+    const widthPct = (((hi - lo) / range) * 100).toFixed(0);
+    // Simple daily playability
+    const dayPlay = calcPlayability(hi, kmhToMph(d.wind_speed_10m_max[i]), kmhToMph(d.wind_gusts_10m_max[i]), d.precipitation_probability_max[i], 60, d.uv_index_max[i], d.weather_code[i]);
+    const playColor = dayPlay >= 70 ? 'var(--green)' : dayPlay >= 45 ? 'var(--amber)' : 'var(--red)';
+    dailyHTML += `
+      <div class="daily-row">
+        <div class="daily-day">${dayName}</div>
+        <div class="daily-icon">${icon}</div>
+        <div class="daily-temps">
+          <div class="daily-lo">${lo}°</div>
+          <div class="daily-bar"><div class="daily-bar-fill" style="left:${leftPct}%;width:${widthPct}%"></div></div>
+          <div class="daily-hi">${hi}°</div>
+        </div>
+        <div class="daily-play" style="color:${playColor}">${dayPlay}</div>
+      </div>`;
+  }
+
+  // Pressure trend narrative
+  let pressureTrend = '';
+  if (currentHourIdx >= 3) {
+    const pDiff = pressure - h.surface_pressure[currentHourIdx - 3];
+    if (pDiff > 1) pressureTrend = 'rising (improving)';
+    else if (pDiff < -1) pressureTrend = 'falling (deteriorating)';
+    else pressureTrend = 'steady';
+  }
+
+  // Lightning risk
+  const lightningRisk = weatherCode >= 95 ? 'HIGH — Seek shelter immediately' : weatherCode >= 80 ? 'Moderate — Monitor sky conditions' : 'Low';
+  const lightningClass = weatherCode >= 95 ? 'poor' : weatherCode >= 80 ? 'caution' : 'good';
+
+  // Build page
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div style="text-align:center;padding:12px 0 0;color:rgba(255,255,255,0.7);font-size:13px;">
+      ${wxIcon} ${locationName} — ${wxLabel}
+    </div>
+
+    ${weatherCode >= 95 ? `<div class="alert-banner"><div class="alert-title">⚠ THUNDERSTORM WARNING</div><div class="alert-text">Active convective activity detected. Lightning risk HIGH. Suspend play and seek shelter per USGA guidelines. 30-minute all-clear rule applies.</div></div>` : ''}
+
+    <div class="card">
+      <div class="card-header">Playability Index</div>
+      <div class="playability">
+        <div class="play-score ${getScoreClass(playScore)}">${playScore}</div>
+        <div class="play-label">OUT OF 100</div>
+        <div class="play-verdict" style="color:${verdictClass === 'good' ? 'var(--green)' : verdictClass === 'caution' ? 'var(--amber)' : 'var(--red)'}">${verdict}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Current Conditions</div>
+      <div class="metric-grid">
+        <div class="metric">
+          <div class="metric-label">Temperature</div>
+          <div class="metric-value">${tempF}°F</div>
+          <div class="metric-note">Feels ${apparentTemp}°F</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Dewpoint</div>
+          <div class="metric-value">${dewpointF}°F</div>
+          <div class="metric-note">${dewpointF > 70 ? 'Oppressive' : dewpointF > 65 ? 'Uncomfortable' : dewpointF > 60 ? 'Noticeable' : 'Comfortable'}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Relative Humidity</div>
+          <div class="metric-value">${rh}%</div>
+          <div class="metric-note">${rh > 85 ? 'Ball drag increased' : rh < 40 ? 'Dry — extra carry' : 'Normal flight'}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">UV Index</div>
+          <div class="metric-value">${uvIndex.toFixed(1)}</div>
+          <div class="metric-note">${uvIndex >= 8 ? 'Very High — SPF 50+' : uvIndex >= 6 ? 'High — SPF 30+' : uvIndex >= 3 ? 'Moderate — SPF 15+' : 'Low'}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Pressure</div>
+          <div class="metric-value">${(pressure * 0.02953).toFixed(2)}"</div>
+          <div class="metric-note">${pressureTrend} ${pressure < 1010 ? '· Less carry' : '· Normal density'}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Visibility</div>
+          <div class="metric-value">${(visibility / 1609.34).toFixed(1)}</div>
+          <div class="metric-unit">miles</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Cloud Cover</div>
+          <div class="metric-value">${cloudCover}%</div>
+          <div class="metric-note">${cloudCover > 80 ? 'Overcast' : cloudCover > 50 ? 'Broken' : cloudCover > 25 ? 'Scattered' : 'Clear'}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Precip Prob</div>
+          <div class="metric-value">${precipProb}%</div>
+          <div class="metric-note">${precipMm > 0 ? mmToIn(precipMm) + '" falling' : 'Dry'}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Wind Analysis</div>
+      <div class="metric-grid three-col">
+        <div class="metric">
+          <div class="metric-label">Sustained</div>
+          <div class="metric-value">${windMph}</div>
+          <div class="metric-unit">mph</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Gusts</div>
+          <div class="metric-value">${gustMph}</div>
+          <div class="metric-unit">mph</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Direction</div>
+          <div class="metric-value">${degToCompass(windDir)}</div>
+          <div class="metric-unit">${windDir}°</div>
+        </div>
+      </div>
+      <div class="narrative">${windNarrative(windMph, gustMph, windDir)}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Course Conditions Estimate</div>
+      <div class="conditions-grid">
+        <div class="cond-item">
+          <div class="cond-label">Green Speed</div>
+          <div class="cond-value ${conds.greens[1]}">${conds.greens[0]}</div>
+        </div>
+        <div class="cond-item">
+          <div class="cond-label">Fairways</div>
+          <div class="cond-value ${conds.fairways[1]}">${conds.fairways[0]}</div>
+        </div>
+        <div class="cond-item">
+          <div class="cond-label">Bunkers</div>
+          <div class="cond-value ${conds.bunkers[1]}">${conds.bunkers[0]}</div>
+        </div>
+        <div class="cond-item">
+          <div class="cond-label">Ball Flight</div>
+          <div class="cond-value ${conds.ballFlight[1]}">${conds.ballFlight[0]}</div>
+        </div>
+        <div class="cond-item">
+          <div class="cond-label">Lightning Risk</div>
+          <div class="cond-value ${lightningClass}">${lightningRisk}</div>
+        </div>
+        <div class="cond-item">
+          <div class="cond-label">24h Precip</div>
+          <div class="cond-value">${mmToIn(precip24h)}"</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Hourly Tee-Time Forecast</div>
+      <div class="hourly-scroll">${hourlyHTML}</div>
+      <div style="padding:4px 16px 12px;font-size:10px;color:var(--gray);">Yellow = prime tee-time window (7–10 AM)</div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">7-Day Outlook &nbsp;&nbsp;<span style="font-weight:400;font-size:10px;opacity:0.7">PLAY SCORE →</span></div>
+      ${dailyHTML}
+    </div>
+
+    <div class="card">
+      <div class="card-header">Meteorologist Notes</div>
+      <div class="narrative">
+        <strong>Sunrise:</strong> ${sunriseStr} &nbsp;|&nbsp; <strong>Sunset:</strong> ${sunsetStr}<br><br>
+        <strong>Air Density & Ball Flight:</strong> Station pressure ${(pressure * 0.02953).toFixed(2)}" Hg at ${tempF}°F with ${rh}% RH yields
+        ${pressure < 1010 && tempF > 75 ? 'reduced air density — expect 2-4% additional carry on full shots. Club down accordingly.' :
+          pressure > 1025 && tempF < 60 ? 'elevated air density — expect 2-3% reduced carry. Club up on approaches.' :
+          'near-standard air density. Carry distances should track to baseline yardages.'}<br><br>
+        <strong>Barometric Trend:</strong> Pressure ${pressureTrend || 'data insufficient'}. ${pressureTrend === 'falling (deteriorating)' ? 'Expect incoming weather system; conditions may degrade. Monitor radar for convective development.' : pressureTrend === 'rising (improving)' ? 'High pressure building; conditions should improve through the forecast period.' : 'Stable synoptic pattern; current conditions expected to persist.'}<br><br>
+        <strong>Comfort Index:</strong> Dewpoint at ${dewpointF}°F ${dewpointF > 68 ? 'places conditions in the tropical discomfort range. Aggressive hydration protocol recommended: 8-12 oz fluid per hole. Core body temp management critical for back nine performance.' : dewpointF > 60 ? 'indicates moderate moisture content. Standard hydration intervals sufficient. Grip moisture management advisable.' : 'indicates comfortable conditions with low moisture stress. Standard hydration protocol adequate.'}
+      </div>
+    </div>
+
+    <div class="footer-note">
+      Open-Meteo ECMWF/GFS blend &bull; Updated ${now.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}<br>
+      Professional meteorological analysis for course play decisions
+    </div>
+  `;
+}
+
+async function loadForecast() {
+  const zip = document.getElementById('zipInput').value.trim();
+  if (!/^\d{5}$/.test(zip)) { alert('Enter a valid 5-digit ZIP'); return; }
+
+  document.getElementById('app').innerHTML = '<div class="loading"><div class="spinner"></div>Fetching ECMWF/GFS blend data...</div>';
+
+  try {
+    const geo = await geocodeZip(zip);
+    const wx = await fetchWeather(geo.lat, geo.lon);
+    render(wx, geo.name);
+  } catch (err) {
+    document.getElementById('app').innerHTML = `<div class="loading" style="color:#fca5a5;">Error: ${err.message}<br>Check ZIP and retry.</div>`;
+  }
+}
+
+// Auto-load on page open
+loadForecast();
+</script>
+</body>
+</html>
